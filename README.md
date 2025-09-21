@@ -1,5 +1,276 @@
-
 # Práctica 1 de laboratorio - Introducción al lenguaje C
+
+**Integrantes del equipo**
+- David Mejía Castaño  
+- Juan Pablo Zuluaga Jaramillo  
+- David Stiven Rodríguez Taborda
+
+> ## Objetivos
+> * Aprender a codificar programas usando el lenguaje C a nivel básico e intermedio.
+> * Aprender a usar las herramientas básicas para desarrollar aplicaciones en un ambiente de desarrollo linux.
+
+## Herramientas necesarias
+- macOS o Linux con `clang` o `gcc`
+- Terminal / shell
+- (Opcional) `diff`, `hexdump` y `python3` para pruebas
+
+---
+
+## Compilación
+
+```bash
+clang -std=c11 -Wall -Wextra -O2 -o reverse reverse.c
+````
+
+---
+
+## Casos de prueba
+
+> Todos los mensajes de error deben salir por **stderr** y el programa debe terminar con **código 1** en caso de error.
+
+### 1) stdin → stdout (interactivo, EOF)
+
+```bash
+./reverse
+uno
+dos
+tres
+# presiona Enter y luego Ctrl+D
+```
+
+**Esperado:**
+
+```
+tres
+dos
+uno
+```
+
+### 2) Pipe básico (sin interacción)
+
+```bash
+printf "hello\nthis\nis\na file\n" | ./reverse
+```
+
+**Esperado:**
+
+```
+a file
+is
+this
+hello
+```
+
+### 3) Redirección desde archivo (sin argumentos)
+
+```bash
+printf "A\nB\nC\n" > in.txt
+./reverse < in.txt
+```
+
+**Esperado:**
+
+```
+C
+B
+A
+```
+
+### 4) Un archivo como argumento (1 arg)
+
+```bash
+printf "1\n2\n3\n" > input.txt
+./reverse input.txt
+```
+
+**Esperado:**
+
+```
+3
+2
+1
+```
+
+### 5) Dos archivos (entrada y salida) (2 args)
+
+```bash
+printf "alpha\nbeta\n" > in.txt
+./reverse in.txt out.txt
+cat out.txt
+```
+
+**Esperado:**
+
+```
+beta
+alpha
+```
+
+### 6) Error: archivo de entrada inexistente
+
+```bash
+./reverse no-existe.txt 2>err.txt; echo $?
+cat err.txt
+```
+
+**Esperado:**
+
+* Código de salida: `1`
+* Mensaje exacto:
+
+```
+error: cannot open file 'no-existe.txt'
+```
+
+### 7) Error: demasiados argumentos (usage)
+
+```bash
+./reverse a b c 2>err.txt; echo $?
+cat err.txt
+```
+
+**Esperado:**
+
+* Código de salida: `1`
+* Mensaje exacto:
+
+```
+usage: reverse <input> <output>
+```
+
+### 8) Error: entrada y salida son el mismo archivo
+
+```bash
+printf "x\n" > same.txt
+./reverse same.txt same.txt 2>err.txt; echo $?
+cat err.txt
+```
+
+**Esperado:**
+
+* Código de salida: `1`
+* Mensaje exacto:
+
+```
+El archivo de entrada y salida deben diferir
+```
+
+### 9) Preservar líneas vacías
+
+```bash
+printf "a\n\n\nb\n" | ./reverse | hexdump -C | head
+```
+
+**Esperado (visualmente):**
+
+```
+b
+
+a
+```
+
+(Se conservan los saltos de línea tal cual.)
+
+### 10) UTF-8 (acentos)
+
+```bash
+printf "árbol\nniño\nmañana\n" | ./reverse
+```
+
+**Esperado:**
+
+```
+mañana
+niño
+árbol
+```
+
+### 11) Línea muy larga (stress de memoria)
+
+```bash
+{ python3 - <<'PY'
+print("X"*200000)
+print("Y")
+PY
+} | ./reverse | head -n 2
+```
+
+**Esperado (primeras dos líneas):**
+
+```
+Y
+<una línea con 200000 X>
+```
+
+### 12) Salida no escribible (permisos)
+
+```bash
+printf "uno\ndos\n" > in.txt
+touch out_ro.txt
+chmod -w out_ro.txt
+./reverse in.txt out_ro.txt 2>err.txt; echo $?
+cat err.txt
+chmod +w out_ro.txt
+```
+
+**Esperado:**
+
+* Código de salida: `1`
+* Mensaje exacto:
+
+```
+error: cannot open file 'out_ro.txt'
+```
+
+---
+
+## Mini suite opcional
+
+Guarda esto como `quick-test.sh` y ejecútalo con `bash quick-test.sh`:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+exe=./reverse
+
+printf "hello\nthis\nis\na file\n" | $exe > got.txt
+printf "a file\nis\nthis\nhello\n" > expect.txt
+diff -u expect.txt got.txt
+
+printf "1\n2\n3\n" > in.txt
+$exe in.txt > got.txt
+printf "3\n2\n1\n" > expect.txt
+diff -u expect.txt got.txt
+
+$exe no-existe.txt 2>err.txt && exit 1 || true
+grep -Fx "error: cannot open file 'no-existe.txt'" err.txt >/dev/null
+
+$exe a b c 2>err.txt && exit 1 || true
+grep -Fx "usage: reverse <input> <output>" err.txt >/dev/null
+
+printf "x\n" > s.txt
+$exe s.txt s.txt 2>err.txt && exit 1 || true
+grep -Fx "El archivo de entrada y salida deben diferir" err.txt >/dev/null
+
+printf "árbol\nniño\nmañana\n" | $exe > got.txt
+printf "mañana\nniño\nárbol\n" > expect.txt
+diff -u expect.txt got.txt
+
+printf "a\n\n\nb\n" | $exe > got.txt
+printf "b\n\n\na\n" > expect.txt
+diff -u expect.txt got.txt
+
+{ python3 - <<'PY'
+print("X"*200000)
+print("Y")
+PY
+} | $exe > got.txt
+head -n1 got.txt | grep -x "Y" >/dev/null
+
+echo "OK - todas las pruebas pasaron"
+
+```
 
 > ## Objetivos
 > * Aprender a codificar programas usando el lenguaje C a nivel básico e intermedio.
